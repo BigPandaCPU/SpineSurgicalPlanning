@@ -1,0 +1,17 @@
+name: verse20
+channels:
+        - conda-forge
+dependencies:
+        - python=3.7
+        - pytorch=1.4
+        - numpy
+        - scipy
+        - matplotlib
+        - pickle5
+        - scikit-image
+        - nilearn
+        - networkx
+        - nibabel
+        - simpleitk
+        - jupyter
+        - pandas

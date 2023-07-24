@@ -1,0 +1,57 @@
+ ... starting to process:  /media/alg/data3/DeepSpineData/CTSpine1k_new/image/good/CTC-1018399231.nii.gz
+
+read image.
+read image done.
+pySiddonGpu init:
+pySiddonGpu init done.
+Siddon object destruction: GPU memory cleared done 
+
+./models/SpineDRR/best.pt
+/media/alg/data3/DeepSpineData/CTSpine1k_new/image/predict_verSeg/CTC-1018399231
+./models/SpineDRR/best.pt
+/media/alg/data3/DeepSpineData/CTSpine1k_new/image/predict_verSeg/CTC-1018399231/yolo
+YOLOv5 🚀 2023-7-17 Python-3.7.0 torch-1.9.0+cu102 CUDA:0 (NVIDIA GeForce RTX 2080 Ti, 11019MiB)
+
+Fusing layers... 
+Model summary: 157 layers, 7015519 parameters, 0 gradients, 15.8 GFLOPs
+image 1/2 /media/alg/data3/DeepSpineData/CTSpine1k_new/image/predict_verSeg/CTC-1018399231/drr/DRR_front.png: 640x512 1 front_drr, 4.2ms
+image 2/2 /media/alg/data3/DeepSpineData/CTSpine1k_new/image/predict_verSeg/CTC-1018399231/drr/DRR_side.png: 640x512 1 side_drr, 4.2ms
+Speed: 0.3ms pre-process, 4.2ms inference, 0.6ms NMS per image at shape (1, 3, 640, 640)
+ ... loaded CT volume in isotropic resolution and PIR orientation 
+ ... obtained spine binary segmentation 
+
+pred loc: [[         33           1           0]
+ [         55           1           0]]
+ ... obtained 2 initial 3D locations 
+
+Main consistency loop:  1
+if locations coherent: False. 
+if masks coherent: False. 
+if labels coherent: False. 
+
+ previous locations:  []
+ current locations:  [[         33           1           0]
+ [         55           1           0]]
+ previous labels:  []
+ current labels:  [None None]
+
+ ========== refining location 1/2, label: None ============
+computing center of mass, segmented size:  0
+
+ ========== refining location 2/2, label: None ============
+computing center of mass, segmented size:  0
+duplicated_locations_idx:  []
+  1%|          | 8/865 [20:10<36:01:19, 151.32s/it]
+Traceback (most recent call last):
+  File "/data2/wangxiong/PyProject/vertebrae_segmentation-master/test_DRR.py", line 321, in <module>
+    models['id_thoracic'], models['id_lumbar'])
+  File "/data2/wangxiong/PyProject/vertebrae_segmentation-master/consistency_loop.py", line 1095, in consistency_refinement_close_loop
+    loc_has_converged, loc_needs_refinement)
+  File "/data2/wangxiong/PyProject/vertebrae_segmentation-master/consistency_loop.py", line 195, in locations_and_masks_without_duplication
+    duplicated_locations_idx)
+  File "/data2/wangxiong/PyProject/vertebrae_segmentation-master/consistency_loop.py", line 150, in remove_duplicated_locations_with_masks
+    sort_idx = np.argsort(locations[:,1])
+IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed
+
+Process finished with exit code 1
+
