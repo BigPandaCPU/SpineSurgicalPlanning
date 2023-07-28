@@ -429,6 +429,55 @@ def locate(pir_vol, sagittal_model_file, coronal_model_file):
 
     print("\npred loc:",coordinate)
 
+    save_sag_img_file = "/media/alg/data3/DeepSpineData/spine_test/Test09/predict_spine/sag.png"
+    draw_points2png(sagittal_img_norm, loc_sag, save_sag_img_file)
+
+    save_cor_img_file = "/media/alg/data3/DeepSpineData/spine_test/Test09/predict_spine/cor.png"
+    draw_points2png(coronal_img_norm, loc_cor, save_cor_img_file)
+
+
     return coordinate
 
 
+def draw_points2png(data, locations, save_img_file):
+    import numpy as np
+    from PIL import Image, ImageDraw
+    data_min = np.min(data)
+    data_max = np.max(data)
+    data = (data - data_min) / (data_max - data_min) * 255
+
+    img = Image.fromarray(data.astype('uint8'))
+    img = img.convert("RGB")
+    drawing = ImageDraw.Draw(img)
+    for loc in locations:
+        y = loc[0]
+        x = loc[1]
+        drawing.ellipse(((x-3, y-3), (x+3, y+3)), fill=(0, 0,255))
+    img.save(save_img_file)
+
+
+
+
+
+
+
+# def convert_drr_txt2png(drr_txt_file, save_png_file):
+#     """
+#
+#     :param dtt_txt_file:
+#     :param save_png_file:
+#     :return:
+#     """
+#     data = np.loadtxt(drr_txt_file)
+#     data=data[::-1, :]
+#     data_min = np.min(data)
+#     data_max = np.max(data)
+#     data = (data-data_min)/(data_max-data_min)*255
+#
+#     image_out = Image.fromarray(data.astype('uint8'))
+#     img_as_img = image_out.convert("RGB")
+#     img_as_img.save(save_png_file)
+#     # ans = plt.imshow(data, cmap=plt.cm.gray)
+#     # plt.colorbar()
+#     # plt.show()
+#     print("down")
