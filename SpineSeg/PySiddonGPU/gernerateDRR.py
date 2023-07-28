@@ -23,6 +23,7 @@ class DicomInfo:
         self.dimensions = []
         self.origin = []
         self.spacing = []
+        self.direction = []
         self.extent = []
 
 
@@ -53,6 +54,7 @@ def ImageReader(image_file_path):
         dicom_info.spacing = image.GetSpacing()
         dicom_info.extent = [0, dicom_info.dimensions[0] - 1, 0, dicom_info.dimensions[1] - 1, 0,
                              dicom_info.dimensions[2] - 1]
+        dicom_info.direction = image.GetDirection()
 
 
     spacing = image.GetSpacing()
