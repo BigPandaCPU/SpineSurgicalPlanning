@@ -266,7 +266,7 @@ def reorient_resample_back_to_original_pytorch(img: object, ori_orient_code: obj
 
     time_start = time.time()
     transformed_img = reorienting(img, itm_orient, ori_orient_code)
-    transformed_img = transformed_img.transpose(2,1,0)
+    #transformed_img = transformed_img.transpose(2,1,0)
     resize_fn = resize_segmentation
     kwargs = OrderedDict()
     order = 3
@@ -352,9 +352,18 @@ def write_result_to_file(pir_mask, ori_orient_code, spacing, ori_size, ori_aff, 
 
 
 def get_result_of_mask(pir_mask, ori_orient_code, spacing, ori_size, ori_aff, save_dir, filename):
+    import time
     annotation = annotation_from_mask(pir_mask)
     write_dict_to_file(annotation, os.path.join(save_dir, '{}_ctd.json'.format(filename)))
+    time_start = time.time()
+
+    #print("\npir_mask shape:", pir_mask.shape)
     #mask = reorient_resample_back_to_original_pytorch(pir_mask, ori_orient_code, spacing, ori_size, ori_aff)
+    #print("mask shape:", mask.shape)
     mask = reorient_resample_back_to_original(pir_mask, ori_orient_code, spacing, ori_size, ori_aff)
+    #save_to_nifti_file(mask, os.path.join(save_dir, '{}_seg.nii.gz'.format(filename)), ori_aff)
+
+    time_end = time.time()
+    print("nibabel resample time:", time_end-time_start)
     mask = mask.transpose(2, 1, 0)
     return mask
