@@ -55,6 +55,7 @@ from SpineSeg.yolov5.utils.torch_utils import select_device, smart_inference_mod
 def run(
         weights=ROOT / 'yolov5s.pt',  # model path or triton URL
         source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)
+        save_dir=ROOT/'predict',
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
@@ -92,7 +93,7 @@ def run(
         source = check_file(source)  # download
 
     # Directories
-    save_dir = source + "/yolo" #increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    save_dir = save_dir ##increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     os.makedirs(save_dir, exist_ok=True)
     print(save_dir)
     #(save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
@@ -103,7 +104,7 @@ def run(
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
-    img_source = os.path.join(source, "drr")
+    img_source = source
 
     # Dataloader
     bs = 1  # batch_size
@@ -232,6 +233,7 @@ def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path or triton URL')
     parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir/URL/glob/screen/0(webcam)')
+    parser.add_argument('--save_dir', type=str, default=ROOT/'predict')
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='(optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
@@ -269,10 +271,12 @@ def main(opt: object) -> object:
 
 
 
-def yolo_predict(img_dir, mode="Hip"):
+def yolo_predict(img_dir, save_dir, mode="Hip"):
     """
     """
     opt = ParseOpt()
+    opt.source = img_dir
+    opt.save_dir = save_dir
     if mode == "Hip":
         opt.weights = "./models/HipDRR/best.pt"
         opt.data = "./models/HipDRR/hip_drr.yaml"
@@ -285,12 +289,15 @@ def yolo_predict(img_dir, mode="Hip"):
     if mode == "Lumbar":
         opt.weights = "./models/LumbarDRR/best.pt"
         opt.data = "./models/LumbarDRR/lumbar_drr.yaml"
+    if mode == "SpineCor":
+        opt.weights = "./models/SpineCor/best.pt"
+        opt.data = "./models/SpineCor/spine_cor.yaml"
     opt.source = img_dir #"/media/alg/data3/DeepHipData/hip_test/dt10/predict"
 
     print(opt.weights)
     print(opt.source)
     opt.save_txt = True
-    opt.project = img_dir #"/media/alg/data3/DeepHipData/hip_test/dt10/predict"
+    #opt.project = img_dir #"/media/alg/data3/DeepHipData/hip_test/dt10/predict"
     main(opt)
 
 
