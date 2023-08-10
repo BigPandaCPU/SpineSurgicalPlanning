@@ -311,6 +311,16 @@ def get_loc_from_pred(pred_map):
 
     return loc
 
+def save_pred_map_as_png(pred_map, save_img_file):
+    import numpy as np
+    from PIL import Image, ImageDraw
+    data_min = np.min(pred_map)
+    data_max = np.max(pred_map)
+    data = (pred_map - data_min) / (data_max - data_min) * 255
+
+    img = Image.fromarray(data.astype('uint8'))
+    img = img.convert("RGB")
+    img.save(save_img_file)
 
 def locations_from_prediction_map(pred_map, ori_h, ori_w, view):
 
@@ -429,15 +439,57 @@ def locate(pir_vol, sagittal_model_file, coronal_model_file):
 
     print("\npred loc:",coordinate)
 
-    save_sag_img_file = "/media/alg/data3/DeepSpineData/spine_test/Test09/predict_spine/sag.png"
-    draw_points2png(sagittal_img_norm, loc_sag, save_sag_img_file)
-
-    save_cor_img_file = "/media/alg/data3/DeepSpineData/spine_test/Test09/predict_spine/cor.png"
-    draw_points2png(coronal_img_norm, loc_cor, save_cor_img_file)
-
+    # save_sag_img_file = "/media/alg/data3/DeepSpineData/spine_test/Test13/predict_spine/sag.png"
+    # draw_points2png(sagittal_img_norm, loc_sag, save_sag_img_file)
+    #
+    # save_cor_img_file = "/media/alg/data3/DeepSpineData/spine_test/Test13/predict_spine/cor.png"
+    # draw_points2png(coronal_img_norm, loc_cor, save_cor_img_file)
 
     return coordinate
 
+def get_slice_mask_mean_idx(mask, slice_idxs, ):
+    import numpy as np
+    z_idxs = []
+    for cur_slice in slice_idxs:
+        cur_mask = mask[:,cur_slice, :]
+        idx = np.where(cur_mask>0)
+        idx_x = np.mean([idx[0]])
+        idx_z = np.mean([idx[1]])
+        z_idxs.append(int(idx_z))
+    return np.array(z_idxs)
+
+def locate_yolo(pir_img, pir_img_mask, output_folder):
+    import os
+    import numpy as np
+    from SpineSeg.yolov5.detect import yolo_predict
+    from SpineSeg.utils import loadTxt, convertNormalBox2RealBox
+    coronal_img = np.sum(pir_img, axis=2)
+
+    save_cor_dir = os.path.join(output_folder, "cor")
+    os.makedirs(save_cor_dir, exist_ok=True)
+    save_cor_file = os.path.join(save_cor_dir, "cor.png")
+    convertNumpyArray2Png(coronal_img, save_cor_file)
+
+    mode = "SpineCor"
+    src_img_dir = save_cor_dir
+    save_img_dir = os.path.join(output_folder, "yolo")
+    yolo_predict(src_img_dir, save_img_dir, mode)
+
+    boxs_txt_file = os.path.join(save_img_dir, "cor.txt")
+
+    img_h, img_w = coronal_img.shape
+
+    boxs_xywh = loadTxt(boxs_txt_file)
+    boxs_xywh = np.array(boxs_xywh)
+    #boxs_xyxy = convertNormalBox2RealBox(boxs_xywh, img_w, img_h)
+    locations_xy = np.around(np.array(boxs_xywh[:, :2]) * np.array([img_w, img_h])).astype(np.int32)
+
+    locations_z = get_slice_mask_mean_idx(pir_img_mask, locations_xy[:, 0])
+    locations = np.zeros([len(locations_z), 3])
+    locations[:, :2] = locations_xy[:,::-1]
+    locations[:, 2] = locations_z
+    locations = locations[locations[:, 1].argsort()]
+    return locations.astype(np.int32)
 
 def draw_points2png(data, locations, save_img_file):
     import numpy as np
@@ -456,6 +508,17 @@ def draw_points2png(data, locations, save_img_file):
     img.save(save_img_file)
 
 
+def convertNumpyArray2Png(data, save_img_file):
+    import numpy as np
+    from PIL import Image, ImageDraw
+    data_min = np.min(data)
+    data_max = np.max(data)
+    data = (data - data_min) / (data_max - data_min) * 255
+
+    img = Image.fromarray(data.astype('uint8'))
+    img = img.convert("RGB")
+    #img = img.rotate(90)
+    img.save(save_img_file)
 
 
 

@@ -13,19 +13,19 @@ __authors__ = "Di Meng"
 
 import time
 import argparse, os, glob, sys
-from SpineSeg.utils import mkpath, read_isotropic_pir_img_from_nifti_img, write_result_to_file, get_result_of_mask
+from SpineSeg.utils import mkpath, read_isotropic_pir_img_from_nifti_img
+from SpineSeg.utils import getSpineBBoxFromImage, get_result_of_mask
+from SpineSeg.utils import removeAllFiles
 import numpy as np
 import torch
 import time
-from tqdm import tqdm
 import nibabel as nib
 import SimpleITK as sitk
 
 from utils.file_operations import createSpinePlanningPropFile, createSpineHurFile
 
 torch.set_grad_enabled(False)
-from SpineSeg.PySiddonGPU.gernerateDRR import generateDRR
-from SpineSeg.yolov5.detect import yolo_predict
+
 
 
 def load_models(seg_spine_norm=False, seg_vert_norm=False):
@@ -53,136 +53,6 @@ def load_models(seg_spine_norm=False, seg_vert_norm=False):
             'loc_sagittal': model_file_loc_sag, 'loc_coronal': model_file_loc_cor,
             'id_group': id_group_model_file, 'id_cervical': id_cer_model_file,
             'id_thoracic': id_thor_model_file, 'id_lumbar': id_lum_model_file}
-
-def loadTxt(txt_file):
-    fp = open(txt_file)
-    lines = fp.readlines()
-    fp.close()
-    line_values = []
-    for line in lines:
-        line = line.strip()
-        line_list = line.split(" ")
-        cur_line_value = []
-        for i in range(1, len(line_list)):
-            line_value = line_list[i]
-            cur_line_value.append(float(line_value))
-        line_values.append(cur_line_value)
-    return line_values
-
-def convertNormalBox2RealBox(boxs, img_w, img_h):
-    boxs_xyxy = []
-    for box in boxs:
-        box_xyxy = [None]*4
-        box_xyxy[0] = int((box[0] - box[2]/2.0)*img_w)
-        box_xyxy[1] = int((box[1] - box[3]/2.0)*img_h)
-        box_xyxy[2] = int((box[0] + box[2]/2.0)*img_w)
-        box_xyxy[3] = int((box[1] + box[3]/2.0)*img_h)
-        boxs_xyxy.append(box_xyxy)
-    return boxs_xyxy
-
-def getCropBox(drr_output_folder, yolo_output_folder):
-    img_info_file = os.path.join(drr_output_folder, "img_info.txt")
-    imgX, imgY, imgZ = np.loadtxt(img_info_file).astype(int)
-
-
-    drr_front_txt_file = os.path.join(yolo_output_folder, 'DRR_front.txt')
-    if not os.path.exists(drr_front_txt_file):
-        return None
-    drr_front_boxs_xywh = loadTxt(drr_front_txt_file)
-    drr_front_boxs_xyxy = convertNormalBox2RealBox(drr_front_boxs_xywh, imgX, imgZ)
-
-    #assert len(drr_front_boxs_xyxy) == 1, "there are more than one hip "
-    if len(drr_front_boxs_xyxy) > 1:
-        return None
-
-    #print(drr_front_boxs_xyxy)
-
-    drr_side_txt_file = os.path.join(yolo_output_folder, "DRR_side.txt")
-    if not os.path.exists(drr_side_txt_file):
-        return None
-
-    drr_side_boxs_xywh = loadTxt(drr_side_txt_file)
-    drr_side_boxs_xyxy = convertNormalBox2RealBox(drr_side_boxs_xywh, imgY, imgZ)
-
-    if len(drr_side_boxs_xyxy) > 1:
-        drr_side_box_xyxy = getAimBox(drr_side_boxs_xyxy, drr_front_boxs_xyxy[0])
-    else:
-        drr_side_box_xyxy = drr_side_boxs_xyxy[0]
-    drr_front_box_xyxy = drr_front_boxs_xyxy[0]
-    crop_box_mixX = np.max([drr_front_box_xyxy[0]-10, 0])
-    crop_box_maxX = np.min([drr_front_box_xyxy[2]+10, imgX])
-    crop_box_mixY = np.max([drr_side_box_xyxy[0]-10, 0])
-    crop_box_maxY = np.min([drr_side_box_xyxy[2]+10, imgY])
-    crop_box_mixZ = int(np.min([drr_front_box_xyxy[1], drr_side_box_xyxy[1]]))
-    crop_box_maxZ = int(np.max([drr_front_box_xyxy[3], drr_side_box_xyxy[3]]))
-
-    crop_boxs = [[crop_box_mixX, crop_box_maxX, crop_box_mixY, crop_box_maxY, imgZ - crop_box_maxZ, imgZ-crop_box_mixZ]]
-    return crop_boxs
-
-def getAimBox(source_boxs, reference_box):
-    for source_box in source_boxs:
-        stack_minY = np.max([source_box[1], reference_box[1]])
-        stack_maxY = np.min([source_box[3], reference_box[3]])
-
-        if stack_maxY > stack_minY:
-            return source_box
-
-def removeAllFiles(src_dir):
-    file_names = os.listdir(src_dir)
-    for file_name in file_names:
-        cur_file = os.path.join(src_dir, file_name)
-        if os.path.isfile(cur_file):
-            os.remove(cur_file)
-
-
-def getSpineBBoxFromImage(input_file, output_folder):
-    #  *** step0:preprare dir ***
-    drr_output_folder = os.path.join(output_folder, "drr")
-    yolo_output_folder = os.path.join(output_folder, 'yolo')
-
-    mode = "Spine"
-
-    os.makedirs(output_folder, exist_ok=True)
-    os.makedirs(drr_output_folder, exist_ok=True)
-    os.makedirs(yolo_output_folder, exist_ok=True)
-    removeAllFiles(drr_output_folder)
-    removeAllFiles(yolo_output_folder)
-
-    #  *** step1: generate DRR img ***
-    drr_ouput_folder = os.path.join(output_folder, "drr")
-    img_data, properties, dicom_info = generateDRR(input_file, drr_output_folder)
-
-    #  *** step2: bbox detection from yolov5 ***  #
-    yolo_predict(output_folder, mode)
-
-    time_yolo = time.time()
-
-    # *** step3: load bbox  *** #
-    crop_boxs = getCropBox(drr_output_folder, yolo_output_folder)
-    time_boxs = time.time()
-    crop_box = crop_boxs[0]
-
-
-    # *** step4: aim img data and parameters prepare *** #
-    spacing = properties['itk_spacing']
-    origin = properties['itk_origin']
-    direction = properties['itk_direction']
-
-    img_data_trans = img_data.transpose(2, 1, 0)
-
-    affine = np.zeros([4, 4])
-    affine[0, 0] = -spacing[0]
-    affine[1, 1] = -spacing[1]
-    affine[2, 2] = spacing[2]
-    affine[0:3, 3] = origin * np.array([-1, -1, 1])
-    affine[3, 3] = 1.0
-
-    ori_size = img_data_trans.shape
-    ori_spacing = np.array(spacing)
-    ori_aff = affine
-    a, b, c = nib.orientations.aff2axcodes(ori_aff)
-    ori_orient_code = a + b + c
-    return img_data, ori_size, ori_spacing, ori_orient_code, ori_aff, crop_box, dicom_info
 
 
 def spineSeg(input_dcm_dir, output_folder):
@@ -240,8 +110,21 @@ def spineSeg(input_dcm_dir, output_folder):
     # Initial locations
     # =================================================================
     time_locate_start = time.time()
-    from SpineSeg.locate import locate
-    locations = locate(pir_img, models['loc_sagittal'], models['loc_coronal'])
+    from SpineSeg.locate import locate, locate_yolo
+    # locations = locate(pir_img, models['loc_sagittal'], models['loc_coronal'])
+    # print("locates ori:", locations)
+
+    pir_img_spine = np.zeros_like(pir_img)
+    idx = np.where(binary_mask > 0)
+    pir_img_spine[idx] = pir_img[idx]
+    locations = locate_yolo(pir_img_spine, binary_mask, output_folder)
+
+    print("locations yolo:", locations)
+    #
+    #locations = np.array([])
+    # loc_file = os.path.join(output_folder, 'loc.npy')
+    # locations = np.load(loc_file)
+    # print("locations locate:", locations)
     time_locate_end = time.time()
     print(' ... obtained {} initial 3D locations '.format(len(locations)))
 
@@ -262,6 +145,8 @@ def spineSeg(input_dcm_dir, output_folder):
                                                                                                models['id_lumbar'])
 
     print("\nfinall loc:", locations)
+    # save_loc_file = os.path.join(output_folder, "loc")
+    # np.save(save_loc_file, locations)
 
     time_con_end = time.time()
     print(' ... obtained PIR multi label segmentation ')
@@ -270,7 +155,6 @@ def spineSeg(input_dcm_dir, output_folder):
     # Save the result in original format
     # =================================================================
     time_save_start = time.time()
-
     mask = np.zeros_like(pir_img_all)
     mask[y_min_new:y_max_new, pir_img_all_Y - z_max_new:pir_img_all_Y - z_min_new,
     pir_img_all_Z-x_max_new:pir_img_all_Z - x_min_new] = multi_label_mask
@@ -303,8 +187,8 @@ if __name__ == "__main__":
     start_label = args.start_spine_label
     end_label = args.end_spine_label
 
-    input_dcm_dir = "/media/alg/data3/DeepSpineData/spine_test/Test13/DICOM"
-    save_dir = "/media/alg/data3/DeepSpineData/spine_test/Test13/predict_spine"
+    input_dcm_dir = "/media/alg/data3/DeepSpineData/spine_test/Test12/DICOM"
+    save_dir = "/media/alg/data3/DeepSpineData/spine_test/Test12/predict_spine"
     mask, dicom_info = spineSeg(input_dcm_dir, save_dir)
 
     mask_itk = sitk.GetImageFromArray(mask)
