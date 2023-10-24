@@ -1,6 +1,8 @@
 # SpineSeg
 fork from https://gitlab.inria.fr/spine/vertebrae_segmentation
+
 所做的工作：
+
 1.增加DRR生成和YoloV5的DRR图像检测模块
 
 2.使用YoloV5检测模型替换SpineLocate模型
